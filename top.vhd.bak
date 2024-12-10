@@ -1,0 +1,77 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+
+-- Définition de l'entité top
+entity top is
+    port (
+        MAX10_CLK1_50 : in std_logic;               -- Horloge de base à 50 MHz
+        KEY           : in std_logic_vector(1 downto 0); -- Boutons
+        SW            : in std_logic_vector(9 downto 0); -- Switches (SW(0) pour reset)
+        HEX0          : out std_logic_vector(6 downto 0); -- Afficheur pour unité des secondes
+        LEDR          : out std_logic_vector(9 downto 0)   -- Sortie pour les LEDs
+    );
+end top;
+
+architecture Behavioral of top is
+
+    component seg7_lut
+        port (
+            digit : in std_logic_vector(3 downto 0);
+            hex   : out std_logic_vector(6 downto 0)
+        );
+    end component;
+
+    component reglage
+        Port (
+         
+            KEY         : in  std_logic_vector(1 downto 0);
+           
+            reset       : in  std_logic;
+            load_value  : out std_logic_vector(3 downto 0);
+            LEDR        : out std_logic_vector(9 downto 0)   -- Sortie pour les LEDs
+        );
+    end component;
+
+    component clock_divider
+        port (
+            clock_in  : in std_logic;      -- horloge d'entrée
+            reset     : in std_logic;      -- réinitialisation asynchrone
+            clock_out : out std_logic       -- horloge de sortie
+        );
+    end component;
+
+    -- Signaux internes
+    signal reset   : std_logic;                     -- Signal de reset (SW(0))
+    signal loaded  : std_logic_vector(3 downto 0); -- Valeur à charger
+    signal ledr_internal : std_logic_vector(9 downto 0); -- Signal interne pour les LEDs
+    signal clk_div : std_logic;                     -- Horloge divisée
+
+begin
+    -- Connecte le switch SW(0) au signal de réinitialisation
+    reset <=  not KEY(0);  -- Utilisation de SW(0) pour réinitialiser
+
+
+    -- Module de réglage
+    ReglageInstance : reglage
+        port map (
+
+            KEY         => KEY,
+          
+            reset       => reset,
+            load_value  => loaded,
+            LEDR        => ledr_internal
+        );
+
+    -- Décodage des sorties pour les afficheurs 7 segments
+    -- Unité des secondes
+    Seg7SecUnitInstance : seg7_lut
+        port map (
+            digit => loaded,
+            hex   => HEX0
+        );
+
+    -- Connecter le signal interne LEDR à la sortie LEDR
+    LEDR <= ledr_internal;
+
+end Behavioral;

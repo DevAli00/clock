@@ -1,0 +1,43 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+
+entity counter is
+    Generic (
+        MAX_COUNT : STD_LOGIC_VECTOR(3 downto 0) := "1001" -- Valeur maximale du compteur (par exemple 9 pour les unités des secondes)
+    );
+    Port (
+        clk         : in  STD_LOGIC;                 -- Horloge
+        reset       : in  STD_LOGIC;                 -- Réinitialisation
+        enable      : in  STD_LOGIC;                 -- Active le comptage
+        load_enable : in  STD_LOGIC;                 -- Signal de validation de chargement
+        load_value  : in  STD_LOGIC_VECTOR(3 downto 0); -- Valeur à charger
+        count       : out STD_LOGIC_VECTOR(3 downto 0); -- Valeur actuelle du compteur
+        carry_out   : out STD_LOGIC                    -- Débordement (1 quand le compteur atteint la valeur maximale)
+    );
+end counter;
+
+architecture Behavioral of counter is
+    signal counter : STD_LOGIC_VECTOR(3 downto 0) := "0000"; -- Valeur interne du compteur
+begin
+    process (clk, reset)
+    begin
+        if reset = '1' then
+            counter <= "0000"; -- Réinitialisation du compteur
+        elsif rising_edge(clk) then
+            if load_enable = '1' then
+                counter <= load_value; -- Charger la valeur de réglage
+            elsif enable = '1' then
+                if counter = MAX_COUNT then
+                    counter <= "0000";  -- Réinitialise le compteur si la valeur maximale est atteinte
+                else
+                    counter <= std_logic_vector(unsigned(counter) + 1);  -- Incrémente le compteur
+                end if;
+            end if;
+        end if;
+    end process;
+
+    -- Sortie
+    count <= counter;  -- Valeur actuelle du compteur
+    carry_out <= '1' when counter = MAX_COUNT else '0'; -- Débordement
+end Behavioral;

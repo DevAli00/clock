@@ -1,0 +1,106 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+
+entity alarme is
+    Port (
+        clock, reset : in STD_LOGIC;
+        KEY : in STD_LOGIC_VECTOR(1 downto 0);
+        SW : in STD_LOGIC_VECTOR(9 downto 0);
+        LEDR : out STD_LOGIC_VECTOR(9 downto 0);
+        alarme_seconds_units, alarme_seconds_tens, alarme_minutes_units, alarme_minutes_tens, alarme_hours_units, alarme_hours_tens : out STD_LOGIC_VECTOR(3 downto 0)
+    );
+end alarme;
+
+architecture Behavioral of alarme is
+    -- Types pour l'état du bouton
+    type button_state_type is (IDLE, PRESSED, WAIT_RELEASE);
+    signal button_state : button_state_type;
+
+    -- Signaux internes sous forme de vecteurs de 4 bits
+    signal alarme_seconds_units_int, alarme_seconds_tens_int, alarme_minutes_units_int, alarme_minutes_tens_int, alarme_hours_units_int, alarme_hours_tens_int : STD_LOGIC_VECTOR(3 downto 0) := "0000";
+
+    -- Signal pour le mode d'alarme
+    signal alarm_mode : STD_LOGIC := '0';
+
+    -- Fonction d'incrémentation
+    function increment_value(value : STD_LOGIC_VECTOR(3 downto 0); limit : STD_LOGIC_VECTOR(3 downto 0)) return STD_LOGIC_VECTOR is
+    begin
+        -- Convertir les valeurs de STD_LOGIC_VECTOR en entier pour la comparaison et l'incrémentation
+        if unsigned(value) >= unsigned(limit) then
+            return "0000";  -- Réinitialisation si la limite est atteinte
+        else
+            return std_logic_vector(unsigned(value) + 1);  -- Incrémentation de la valeur
+        end if;
+    end function;
+
+begin
+    process(clock, reset)
+    begin
+        if reset = '1' then
+            -- Réinitialisation de tous les signaux internes
+            alarme_seconds_units_int <= "0000"; alarme_seconds_tens_int <= "0000"; alarme_minutes_units_int <= "0000";
+            alarme_minutes_tens_int <= "0000"; alarme_hours_units_int <= "0000"; alarme_hours_tens_int <= "0000";
+            button_state <= IDLE;
+            alarm_mode <= '0';
+        elsif rising_edge(clock) then
+            if SW(8) = '1' then  -- Vérification du bouton de contrôle (SW(8))
+                case button_state is
+                    when IDLE =>
+                        if KEY(0) = '0' then  -- Détection de l'appui sur la touche
+                            button_state <= PRESSED;
+                        end if;
+
+                    when PRESSED =>
+                        -- Boucle pour traiter les interrupteurs SW(0) à SW(5)
+                        for i in 0 to 5 loop
+                            if SW(i) = '1' then
+                                -- Appeler la fonction d'incrémentation pour chaque interrupteur activé
+                                case i is
+                                    when 0 =>  -- Unités de secondes (limite 9)
+                                        alarme_seconds_units_int <= increment_value(alarme_seconds_units_int, "1001");
+                                    when 1 =>  -- Dizaines de secondes (limite 5)
+                                        alarme_seconds_tens_int <= increment_value(alarme_seconds_tens_int, "0101");
+                                    when 2 =>  -- Unités de minutes (limite 9)
+                                        alarme_minutes_units_int <= increment_value(alarme_minutes_units_int, "1001");
+                                    when 3 =>  -- Dizaines de minutes (limite 5)
+                                        alarme_minutes_tens_int <= increment_value(alarme_minutes_tens_int, "0101");
+                                    when 4 =>  -- Unités d'heures (limite 9)
+                                        alarme_hours_units_int <= increment_value(alarme_hours_units_int, "1001");
+                                    when 5 =>  -- Dizaines d'heures (limite 2)
+                                        alarme_hours_tens_int <= increment_value(alarme_hours_tens_int, "0010");
+                                    when others => null;  -- Ne fait rien pour les autres interrupteurs
+                                end case;
+                            else
+                                -- Si aucun interrupteur n'est actif, gérer le mode d'alarme
+                                if i = 5 and SW(0) = '0' and SW(1) = '0' and SW(2) = '0' and SW(3) = '0' and SW(4) = '0' and SW(5) = '0' then
+                                    if alarm_mode = '0' then
+                                        alarm_mode <= '1';
+                                    else
+                                        alarm_mode <= '0';
+                                    end if;
+                                end if;
+                            end if;
+                        end loop;
+                        button_state <= WAIT_RELEASE;
+
+                    when WAIT_RELEASE =>
+                        -- Attente de la libération du bouton
+                        if KEY(0) = '1' then
+                            button_state <= IDLE;
+                        end if;
+                end case;
+            end if;
+        end if;
+    end process;
+
+    -- Assignation des valeurs de sortie
+    alarme_seconds_units <= alarme_seconds_units_int; alarme_seconds_tens <= alarme_seconds_tens_int;
+    alarme_minutes_units <= alarme_minutes_units_int; alarme_minutes_tens <= alarme_minutes_tens_int;
+    alarme_hours_units <= alarme_hours_units_int; alarme_hours_tens <= alarme_hours_tens_int;
+
+    -- Activation de la LEDR(8) si le mode d'alarme est activé
+    LEDR <= (others => '0');
+    LEDR(8) <= alarm_mode;
+
+end Behavioral;

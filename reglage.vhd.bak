@@ -1,0 +1,88 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+
+entity reglage is
+    Port (
+        KEY         : in  STD_LOGIC_VECTOR(1 downto 0); -- Bouton de contrôle
+        SW          : in  STD_LOGIC_VECTOR(9 downto 0); -- Interrupteurs de contrôle
+        reset       : in  STD_LOGIC;                    -- Réinitialisation
+        load_value  : out STD_LOGIC_VECTOR(3 downto 0); -- Valeur de chargement
+        LEDR        : out STD_LOGIC_VECTOR(9 downto 0)  -- Sortie pour les LEDs
+    );
+end reglage;
+
+architecture Behavioral of reglage is
+    -- Définition des états
+    type state_type is (IDLE, INCREMENT, WAIT_RELEASE);
+    signal current_state : state_type := IDLE;
+
+    -- Signal pour stocker la valeur à incrémenter
+    signal load : INTEGER := 0;
+
+    -- Signaux pour les LEDs
+    signal LEDR_IDLE : STD_LOGIC := '0';
+    signal LEDR_INCREMENT : STD_LOGIC := '0';
+    signal LEDR_WAIT_RELEASE : STD_LOGIC := '0';
+
+    -- Signal pour stocker l'état précédent de KEY
+    signal KEY_prev : STD_LOGIC_VECTOR(1 downto 0) := "11";
+
+begin
+    process (KEY,reset,SW)
+    begin
+        if reset = '1' then
+            -- Réinitialisation
+            current_state <= IDLE;
+            load <= 0;
+            LEDR_INCREMENT <= '0';
+            LEDR_IDLE <= '0';
+            LEDR_WAIT_RELEASE <= '0';
+            KEY_prev <= "11";
+        else
+            case current_state is
+                when IDLE =>
+                    LEDR_INCREMENT <= '0';
+                    LEDR_IDLE <= '1';
+                    LEDR_WAIT_RELEASE <= '0';
+
+                    if  KEY_prev(0) = '1' then  -- Détection front descendant
+                        current_state <= INCREMENT;
+                    end if;
+
+                when INCREMENT =>
+                    LEDR_INCREMENT <= '1';
+                    LEDR_IDLE <= '0';
+                    LEDR_WAIT_RELEASE <= '0';
+
+                    -- Incrémentation
+                    if load < 9 then
+                        load <= load + 1;
+                    else
+                        load <= 0; -- Remise à 0 si la limite est atteinte
+                    end if;
+
+                    current_state <= WAIT_RELEASE;
+
+                when WAIT_RELEASE =>
+                    LEDR_INCREMENT <= '0';
+                    LEDR_IDLE <= '0';
+                    LEDR_WAIT_RELEASE <= '1';
+
+                    current_state <= IDLE;
+                   
+
+            end case;
+        end if;
+
+        -- Mise à jour de l'état précédent de KEY
+        KEY_prev <= KEY;
+    end process;
+
+    -- Sorties
+    load_value <= std_logic_vector(to_unsigned(load, 4));
+    LEDR(0) <= LEDR_IDLE;
+    LEDR(1) <= LEDR_INCREMENT;
+    LEDR(2) <= LEDR_WAIT_RELEASE;
+
+end Behavioral;
